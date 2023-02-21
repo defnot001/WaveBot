@@ -1,4 +1,4 @@
-# KiwiTech Bot
+# WaveTech-Bot
 
 This repository contains the Discord Bot how it is running on the [WaveTech Discord Server](https://discord.gg/SR6q7sC).
 
