@@ -2,7 +2,7 @@ import { inlineCode, time, userMention } from 'discord.js';
 import { Event } from 'djs-handlers';
 import { JoinLeaveEmbedBuilder } from '../classes/JoinLeaveEmbedBuilder';
 import { colorFromDuration, getJoinedAtComponent } from '../util/helpers';
-import { createEventErrorLog, getTextChannelFromID } from '../util/loggers';
+import { getTextChannelFromID, handleEventError } from '../util/loggers';
 export default new Event('guildMemberAdd', async (member) => {
   try {
     console.log(`${member.user.tag} joined ${member.guild.name}.`);
@@ -10,10 +10,8 @@ export default new Event('guildMemberAdd', async (member) => {
     const memberLog = await getTextChannelFromID(member.guild, 'memberLog');
     const joinedAt = getJoinedAtComponent(member);
 
-    const accountAge: number =
-      new Date().valueOf() - member.user.createdAt.valueOf();
-
-    const embedColor: number = colorFromDuration(accountAge) || 3_092_790;
+    const accountAge = new Date().valueOf() - member.user.createdAt.valueOf();
+    const embedColor = colorFromDuration(accountAge) || 3_092_790;
 
     const joinEmbed = new JoinLeaveEmbedBuilder(member, 'joined', {
       description: `Username: ${userMention(
@@ -28,13 +26,11 @@ export default new Event('guildMemberAdd', async (member) => {
 
     memberLog.send({ embeds: [joinEmbed] });
   } catch (err) {
-    console.error(err);
-    createEventErrorLog({
+    return handleEventError({
+      err,
       client: member.client,
       guild: member.guild,
-      errorMessage: `${inlineCode(
-        'GuildMemberAdd',
-      )} Event triggered but the embed could not be sent.`,
+      message: `Failed to log the join of ${member.user.tag}.`,
     });
   }
 });

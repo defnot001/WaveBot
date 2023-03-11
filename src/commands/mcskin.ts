@@ -2,6 +2,7 @@ import axios from 'axios';
 import { ApplicationCommandOptionType, AttachmentBuilder } from 'discord.js';
 import { Command } from 'djs-handlers';
 import type { TAvatarOptions, TMojangUUIDResponse } from '../types/minecraft';
+import { handleInteractionError } from '../util/loggers';
 
 export default new Command({
   name: 'mcskin',
@@ -36,29 +37,37 @@ export default new Command({
       return interaction.editReply('Please provide a username!');
     }
 
-    const uuidResponse = await axios.get<TMojangUUIDResponse>(
-      `https://api.mojang.com/users/profiles/minecraft/${name}`,
-    );
+    try {
+      const uuidResponse = await axios.get<TMojangUUIDResponse>(
+        `https://api.mojang.com/users/profiles/minecraft/${name}`,
+      );
 
-    if (uuidResponse.status !== 200) {
-      return interaction.editReply('Could not find that user!');
+      if (uuidResponse.status !== 200) {
+        return interaction.editReply('Could not find that user!');
+      }
+
+      const url = `https://crafatar.com${imageType}${uuidResponse.data.id}`;
+
+      const { data, status } = await axios.get<Buffer>(url, {
+        responseType: 'arraybuffer',
+      });
+
+      if (status !== 200) {
+        return interaction.editReply('Could not find the skin of that user!');
+      }
+
+      const skinAttachment = new AttachmentBuilder(data, {
+        name: `${name}.png`,
+        description: 'Minecraft skin of a player.',
+      });
+
+      return interaction.editReply({ files: [skinAttachment] });
+    } catch (err) {
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `Failed to get the skin for ${name}!`,
+      });
     }
-
-    const url = `https://crafatar.com${imageType}${uuidResponse.data.id}`;
-
-    const { data, status } = await axios.get<Buffer>(url, {
-      responseType: 'arraybuffer',
-    });
-
-    if (status !== 200) {
-      return interaction.editReply('Could not find the skin of that user!');
-    }
-
-    const skinAttachment = new AttachmentBuilder(data, {
-      name: `${name}.png`,
-      description: 'Minecraft skin of a player.',
-    });
-
-    return interaction.editReply({ files: [skinAttachment] });
   },
 });

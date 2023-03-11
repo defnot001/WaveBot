@@ -3,12 +3,10 @@ import { Event } from 'djs-handlers';
 import { JoinLeaveEmbedBuilder } from '../classes/JoinLeaveEmbedBuilder';
 import { ModerationEmbedBuilder } from '../classes/ModerationEmbedBuilder';
 import { getJoinedAtComponent } from '../util/helpers';
-import { createEventErrorLog, getTextChannelFromID } from '../util/loggers';
+import { getTextChannelFromID, handleEventError } from '../util/loggers';
 
 export default new Event('guildMemberRemove', async (member) => {
   try {
-    // handle member leaving the guild (this should always run, even if the member was kicked or banned):
-
     console.log(`${member.user.tag} left ${member.guild.name}`);
 
     const joinedAt = getJoinedAtComponent(member);
@@ -25,8 +23,7 @@ export default new Event('guildMemberRemove', async (member) => {
 
     memberLog.send({ embeds: [userLeaveEmbed] });
 
-    // handle member being kicked from the guild:
-
+    // handle member being kicked from the guild
     const fetchedLogs = await member.guild.fetchAuditLogs({
       limit: 1,
       type: AuditLogEvent.MemberKick,
@@ -62,13 +59,11 @@ export default new Event('guildMemberRemove', async (member) => {
       );
     }
   } catch (err) {
-    console.error(err);
-    createEventErrorLog({
+    return handleEventError({
+      err,
       client: member.client,
       guild: member.guild,
-      errorMessage: `${inlineCode(
-        'GuildMemberRemove',
-      )} Event triggered but the embed could not be sent.`,
+      message: `Failed to log the leaving/kick of ${member.user.tag}.`,
     });
   }
 });

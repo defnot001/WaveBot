@@ -3,19 +3,19 @@ import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { config } from '../config/config';
 import type { MCServerSubcommand, TServerChoice } from '../types/minecraft';
+import { isTextChannel } from '../util/assertions';
 import {
   confirmCancelRow,
   getButtonCollector,
   mcServerChoice,
 } from '../util/components';
-import getErrorMessage from '../util/errors';
 import formatTime, {
   capitalizeFirstLetter,
   formatBytes,
   getAction,
   performAction,
 } from '../util/helpers';
-import { createInteractionErrorLog } from '../util/loggers';
+import { handleInteractionError } from '../util/loggers';
 import { ptero } from '../util/pterodactyl';
 
 export default new Command({
@@ -70,7 +70,7 @@ export default new Command({
       );
     }
 
-    if (!interaction.channel) {
+    if (!interaction.channel || !isTextChannel(interaction.channel)) {
       return interaction.editReply(
         'This command can only be used in a text channel!',
       );
@@ -131,18 +131,10 @@ export default new Command({
           );
         }
 
-        try {
-          await ptero.servers.start(serverId);
-          return interaction.editReply(
-            `Successfully started ${guild.name} ${bold(serverChoice)}!`,
-          );
-        } catch (err) {
-          getErrorMessage(err);
-          return createInteractionErrorLog({
-            interaction: interaction,
-            errorMessage: `Failed to start ${serverChoice}!`,
-          });
-        }
+        await ptero.servers.start(serverId);
+        return interaction.editReply(
+          `Successfully started ${guild.name} ${bold(serverChoice)}!`,
+        );
       } else {
         if (subcommand === 'stop' && serverStats.current_state !== 'running') {
           return interaction.editReply(
@@ -182,6 +174,12 @@ export default new Command({
 
         const collector = getButtonCollector(interaction, interaction.channel);
 
+        if (!collector) {
+          return interaction.editReply(
+            'Failed to create message component collector!',
+          );
+        }
+
         collector.on('collect', async (i) => {
           if (i.customId === 'confirm') {
             const result = await performAction(subcommand, serverId);
@@ -205,10 +203,10 @@ export default new Command({
         });
       }
     } catch (err) {
-      getErrorMessage(err);
-      return createInteractionErrorLog({
-        interaction: interaction,
-        errorMessage: `Failed to get the stats for ${serverChoice}!`,
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `Failed to ${subcommand} ${serverChoice}!`,
       });
     }
   },

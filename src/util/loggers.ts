@@ -7,11 +7,15 @@ import type {
   IInteractionErrorOptions,
 } from '../types/errors';
 import { isTextChannel } from './assertions';
+import getErrorMessage from './errors';
 
-export async function createInteractionErrorLog(
+export async function handleInteractionError(
   options: IInteractionErrorOptions,
 ) {
-  const { interaction, errorMessage } = options;
+  const { interaction, err, message } = options;
+
+  const errorMessage = getErrorMessage(err);
+  console.error(errorMessage);
 
   if (!interaction.guild) {
     throw new Error('This interaction was not created in a guild!');
@@ -24,9 +28,9 @@ export async function createInteractionErrorLog(
   }
 
   if (interaction.deferred) {
-    interaction.editReply(errorMessage);
+    interaction.editReply(message);
   } else if (interaction.isRepliable()) {
-    interaction.reply(errorMessage);
+    interaction.reply(message);
   }
 
   const clientUser = interaction.client.user;
@@ -36,7 +40,7 @@ export async function createInteractionErrorLog(
       name: clientUser.username,
       iconURL: clientUser.displayAvatarURL(),
     },
-    description: `${errorMessage}`,
+    description: `${message}`,
     color: config.embedColors.red,
     footer: {
       text: `${clientUser.username} Error Log`,
@@ -47,22 +51,25 @@ export async function createInteractionErrorLog(
   botLog.send({ embeds: [interactionErrorEmbed] });
 }
 
-export async function createEventErrorLog(options: IEventErrorOptions) {
-  const { client, guild, errorMessage } = options;
+export async function handleEventError(options: IEventErrorOptions) {
+  const { client, guild, err, message } = options;
   const botLogChannel = await getTextChannelFromID(guild, 'botLog');
 
   if (!client.user) {
     throw new Error('This client does not have a user!');
   }
 
+  const errorMessage = getErrorMessage(err);
+  console.error(errorMessage);
+
   const eventErrorEmbed = new EmbedBuilder({
     author: {
       name: client.user.username,
       iconURL: client.user.displayAvatarURL(),
     },
-    description: `${errorMessage}`,
+    description: `${message}`,
     footer: {
-      text: 'KiwiBot Error Logging',
+      text: 'Error Logging',
     },
     timestamp: Date.now(),
   });

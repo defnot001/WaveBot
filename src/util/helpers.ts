@@ -23,10 +23,6 @@ export function escapeMarkdown(text: string): string {
   return unescaped.replace(/(\*|_|`|~|\\)/g, '\\$1');
 }
 
-export function includesUndefined<T>(array: (T | undefined)[]) {
-  return array.includes(undefined);
-}
-
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return bytes + ' bytes';

@@ -6,9 +6,8 @@ import {
 import { Command } from 'djs-handlers';
 import { config } from '../config/config';
 import type { TServerChoice } from '../types/minecraft';
-import getErrorMessage from '../util/errors';
 import { getServerChoices } from '../util/helpers';
-import { createInteractionErrorLog } from '../util/loggers';
+import { handleInteractionError } from '../util/loggers';
 import { runRconCommand } from '../util/rcon';
 
 export default new Command({
@@ -61,12 +60,12 @@ export default new Command({
 
       return interaction.editReply(codeBlock(response.toString()));
     } catch (err) {
-      getErrorMessage(err);
-      return createInteractionErrorLog({
-        interaction: interaction,
-        errorMessage: `Failed to execute the command: ${inlineCode(
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `Error while running command ${inlineCode(
           command,
-        )} on ${choice}!`,
+        )} on server ${choice}!`,
       });
     }
   },

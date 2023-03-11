@@ -1,7 +1,7 @@
-import { AuditLogEvent, inlineCode } from 'discord.js';
+import { AuditLogEvent } from 'discord.js';
 import { Event } from 'djs-handlers';
 import { ModerationEmbedBuilder } from '../classes/ModerationEmbedBuilder';
-import { createEventErrorLog, getTextChannelFromID } from '../util/loggers';
+import { getTextChannelFromID, handleEventError } from '../util/loggers';
 
 export default new Event('guildBanRemove', async (guildUnban) => {
   try {
@@ -16,9 +16,7 @@ export default new Event('guildBanRemove', async (guildUnban) => {
 
     const unbanLog = fetchedLogs.entries.first();
 
-    if (!unbanLog) {
-      throw new Error('Cannot find UnbanLog.');
-    }
+    if (!unbanLog) throw new Error('Cannot find UnbanLog.');
 
     const { executor, target, action, reason } = unbanLog;
 
@@ -44,13 +42,11 @@ export default new Event('guildBanRemove', async (guildUnban) => {
       );
     }
   } catch (err) {
-    console.error(err);
-    createEventErrorLog({
+    return handleEventError({
+      err,
       client: guildUnban.client,
       guild: guildUnban.guild,
-      errorMessage: `${inlineCode(
-        'GuildBanAdd',
-      )} Event triggered but the embed could not be sent.`,
+      message: `Failed to log the unban of ${guildUnban.user.tag}.`,
     });
   }
 });

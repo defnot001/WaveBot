@@ -1,8 +1,6 @@
-import { GuildBasedChannel, GuildMember, TextChannel } from 'discord.js';
+import { Channel, GuildMember, TextChannel } from 'discord.js';
 
-export function isTextChannel(
-  channel: GuildBasedChannel,
-): channel is TextChannel {
+export function isTextChannel(channel: Channel): channel is TextChannel {
   return channel instanceof TextChannel;
 }
 

@@ -1,4 +1,6 @@
+import type dictionary119 from '../assets/dictionary_1.19';
 import type { preconfig } from '../config/config';
+import type { customScoreboards } from '../util/rcon';
 
 export type TPowerAction = 'start' | 'stop' | 'restart' | 'kill';
 export type TPowerActionNoStart = Omit<TPowerAction, 'start'>;
@@ -37,3 +39,14 @@ export type TMojangUUIDResponse = {
   name: string;
   id: string;
 };
+
+type TCustomScoreboards =
+  | 'digs'
+  | 'deaths'
+  | 'bedrock_removed'
+  | 'z-play_one_m+748';
+
+export type TScoreboards =
+  | keyof typeof dictionary119
+  | typeof customScoreboards[number]
+  | TCustomScoreboards;

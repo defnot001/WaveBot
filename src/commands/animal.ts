@@ -1,8 +1,7 @@
 import axios from 'axios';
 import { ApplicationCommandOptionType } from 'discord.js';
 import { Command } from 'djs-handlers';
-import getErrorMessage from '../util/errors';
-import { createInteractionErrorLog } from '../util/loggers';
+import { handleInteractionError } from '../util/loggers';
 
 export default new Command({
   name: 'animal',
@@ -24,11 +23,7 @@ export default new Command({
     await interaction.deferReply();
 
     const choice = args.getString('animal');
-
-    // this check is technically not needed, because the command will not be executed if the user does not select an animal
-    if (!choice) {
-      return interaction.editReply('Please select an animal.');
-    }
+    if (!choice) return interaction.editReply('Please select an animal.');
 
     const apiURL = {
       fox: 'https://randomfox.ca/floof/',
@@ -42,10 +37,10 @@ export default new Command({
 
       return interaction.editReply({ files: [imageURL] });
     } catch (err) {
-      getErrorMessage(err);
-      return createInteractionErrorLog({
-        interaction: interaction,
-        errorMessage: `Failed to get an image for ${choice}!`,
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `Something went wrong trying to get a picture of a ${choice}.`,
       });
     }
   },

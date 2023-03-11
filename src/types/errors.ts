@@ -3,11 +3,13 @@ import type { IExtendedInteraction } from 'djs-handlers';
 
 export interface IInteractionErrorOptions {
   interaction: IExtendedInteraction;
-  errorMessage: string;
+  err: unknown;
+  message: string;
 }
 
 export interface IEventErrorOptions {
   client: Client;
   guild: Guild;
-  errorMessage: string;
+  err: unknown;
+  message: string;
 }

@@ -4,8 +4,7 @@ import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { config } from '../config/config';
 import type { TServerChoice } from '../types/minecraft';
 import { mcServerChoice } from '../util/components';
-import getErrorMessage from '../util/errors';
-import { createInteractionErrorLog } from '../util/loggers';
+import { handleInteractionError } from '../util/loggers';
 import { getModFiles, getModNames, ptero } from '../util/pterodactyl';
 
 const modnameOption = {
@@ -109,59 +108,48 @@ export default new Command({
 
         const targetMod = targetMods[0];
 
-        try {
-          if (subcommand === 'enable') {
-            if (targetMod.name.endsWith('.jar')) {
-              return interaction.editReply(
-                `Mod: ${targetMod.name} is already enabled!`,
-              );
-            }
-
-            await ptero.files.rename(config.mcConfig[serverChoice].serverId, {
-              from: targetMod.name,
-              to: targetMod.name.replace('.disabled', '.jar'),
-              directory: '/mods',
-            });
-
+        if (subcommand === 'enable') {
+          if (targetMod.name.endsWith('.jar')) {
             return interaction.editReply(
-              `Successfully enabled mod: ${targetMod.name.replace(
-                '.disabled',
-                '',
-              )}!`,
-            );
-          } else {
-            if (targetMod.name.endsWith('.disabled')) {
-              return interaction.editReply(
-                `Mod: ${targetMod.name} is already disabled!`,
-              );
-            }
-
-            await ptero.files.rename(config.mcConfig[serverChoice].serverId, {
-              from: targetMod.name,
-              to: targetMod.name.replace('.jar', '.disabled'),
-              directory: '/mods',
-            });
-
-            return interaction.editReply(
-              `Successfully disabled mod: ${targetMod.name.replace(
-                '.jar',
-                '',
-              )}!`,
+              `Mod: ${targetMod.name} is already enabled!`,
             );
           }
-        } catch (err) {
-          getErrorMessage(err);
-          return createInteractionErrorLog({
-            interaction: interaction,
-            errorMessage: `Failed to ${subcommand} mod: ${targetMod.name}!`,
+
+          await ptero.files.rename(config.mcConfig[serverChoice].serverId, {
+            from: targetMod.name,
+            to: targetMod.name.replace('.disabled', '.jar'),
+            directory: '/mods',
           });
+
+          return interaction.editReply(
+            `Successfully enabled mod: ${targetMod.name.replace(
+              '.disabled',
+              '',
+            )}!`,
+          );
+        } else {
+          if (targetMod.name.endsWith('.disabled')) {
+            return interaction.editReply(
+              `Mod: ${targetMod.name} is already disabled!`,
+            );
+          }
+
+          await ptero.files.rename(config.mcConfig[serverChoice].serverId, {
+            from: targetMod.name,
+            to: targetMod.name.replace('.jar', '.disabled'),
+            directory: '/mods',
+          });
+
+          return interaction.editReply(
+            `Successfully disabled mod: ${targetMod.name.replace('.jar', '')}!`,
+          );
         }
       }
     } catch (err) {
-      getErrorMessage(err);
-      return createInteractionErrorLog({
-        interaction: interaction,
-        errorMessage: `Failed to get the mods for ${serverChoice}!`,
+      return handleInteractionError({
+        interaction,
+        err,
+        message: 'Something went wrong trying to execute the mods command!',
       });
     }
   },

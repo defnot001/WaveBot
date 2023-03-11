@@ -2,6 +2,7 @@ import { ApplicationCommandOptionType } from 'discord.js';
 import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { getEmojis } from '../util/components';
+import { handleInteractionError } from '../util/loggers';
 
 export default new Command({
   name: 'poll',
@@ -37,18 +38,20 @@ export default new Command({
     },
   ],
   execute: async ({ interaction, args }) => {
-    let question = args.getString('question');
-    const answerType = args.getString('type');
-    const answers = args.getString('answers');
+    try {
+      let question = args.getString('question');
+      const answerType = args.getString('type');
+      const answers = args.getString('answers');
 
-    if (!question || !answerType) {
-      return interaction.reply('Please specify a question and an answer type!');
-    }
+      if (!question || !answerType) {
+        return interaction.reply(
+          'Please specify a question and an answer type!',
+        );
+      }
 
-    question = !question.endsWith('?') ? question + '?' : question;
+      question = !question.endsWith('?') ? question + '?' : question;
 
-    if (answerType === 'yesno') {
-      try {
+      if (answerType === 'yesno') {
         const pollEmbed = new KoalaEmbedBuilder(interaction.user, {
           title: question,
         });
@@ -62,52 +65,59 @@ export default new Command({
 
         await message.react(frogYes);
         return message.react(frogNo);
-      } catch (err) {
-        return interaction.reply('Cannot find emojis!');
-      }
-    } else {
-      if (!answers) {
-        return interaction.reply('Please specify answers!');
-      }
+      } else {
+        if (!answers) {
+          return interaction.reply('Please specify answers!');
+        }
 
-      const emojiArr = [
-        '1️⃣',
-        '2️⃣',
-        '3️⃣',
-        '4️⃣',
-        '5️⃣',
-        '6️⃣',
-        '7️⃣',
-        '8️⃣',
-        '9️⃣',
-        '🔟',
-      ];
+        const emojiArr = [
+          '1️⃣',
+          '2️⃣',
+          '3️⃣',
+          '4️⃣',
+          '5️⃣',
+          '6️⃣',
+          '7️⃣',
+          '8️⃣',
+          '9️⃣',
+          '🔟',
+        ];
 
-      const fields = answers.split(',').map((answer, index) => {
-        return { name: `${emojiArr[index]} ${answer.trim()}`, value: '\u200b' };
+        const fields = answers.split(',').map((answer, index) => {
+          return {
+            name: `${emojiArr[index]} ${answer.trim()}`,
+            value: '\u200b',
+          };
+        });
+
+        if (fields.length > 10) {
+          return interaction.reply('You can only have 10 answers max!');
+        }
+
+        const pollEmbed = new KoalaEmbedBuilder(interaction.user, {
+          title: question,
+          fields,
+        });
+
+        const message = await interaction.reply({
+          embeds: [pollEmbed],
+          fetchReply: true,
+        });
+
+        for (let i = 0; i < fields.length; i++) {
+          const emoji = emojiArr[i];
+          if (!emoji) break;
+          await message.react(emoji);
+        }
+
+        return;
+      }
+    } catch (err) {
+      return handleInteractionError({
+        interaction,
+        err,
+        message: 'Something went wrong trying to execute the poll command!',
       });
-
-      if (fields.length > 10) {
-        return interaction.reply('You can only have 10 answers max!');
-      }
-
-      const pollEmbed = new KoalaEmbedBuilder(interaction.user, {
-        title: question,
-        fields,
-      });
-
-      const message = await interaction.reply({
-        embeds: [pollEmbed],
-        fetchReply: true,
-      });
-
-      for (let i = 0; i < fields.length; i++) {
-        const emoji = emojiArr[i];
-        if (!emoji) break;
-        await message.react(emoji);
-      }
-
-      return;
     }
   },
 });

@@ -39,10 +39,9 @@ export default new Event('interactionCreate', async (interaction) => {
       interaction: interaction as IExtendedInteraction,
     });
   } catch (err) {
-    getErrorMessage(err);
-
+    console.error(getErrorMessage(err));
     return interaction.reply({
-      content: 'There was an error trying to execute this command!',
+      content: `There was an error trying to execute the interaction: ${interaction.commandName}!`,
       ephemeral: true,
     });
   }

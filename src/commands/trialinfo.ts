@@ -4,6 +4,7 @@ import { getTrialWelcomeMessage } from '../assets/welcomeMessage';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { isGuildMember } from '../util/assertions';
 import { getEmojis } from '../util/components';
+import { handleInteractionError } from '../util/loggers';
 
 export default new Command({
   name: 'trialinfo',
@@ -35,24 +36,33 @@ export default new Command({
       });
     }
 
-    const { kiwi } = getEmojis(interaction.client);
+    try {
+      const { kiwi } = getEmojis(interaction.client);
 
-    const trialEmbed = new KoalaEmbedBuilder(interaction.user, {
-      title: `${kiwi}  Welcome to ${guild.name} ${target.user.username}!  ${kiwi}`,
-      thumbnail: {
-        url: target.user.displayAvatarURL(),
-      },
-      fields: getTrialWelcomeMessage(interaction.client),
-    });
+      const trialEmbed = new KoalaEmbedBuilder(interaction.user, {
+        title: `${kiwi}  Welcome to ${guild.name} ${target.user.username}!  ${kiwi}`,
+        thumbnail: {
+          url: target.user.displayAvatarURL(),
+        },
+        fields: getTrialWelcomeMessage(interaction.client),
+      });
 
-    await interaction.reply({
-      content: userMention(target.user.id),
-      embeds: [],
-    });
+      await interaction.reply({
+        content: userMention(target.user.id),
+        embeds: [],
+      });
 
-    return interaction.editReply({
-      content: '\u200b',
-      embeds: [trialEmbed],
-    });
+      return interaction.editReply({
+        content: '\u200b',
+        embeds: [trialEmbed],
+      });
+    } catch (err) {
+      return handleInteractionError({
+        interaction,
+        err,
+        message:
+          'Something went wrong trying to execute the trialinfo command!',
+      });
+    }
   },
 });

@@ -4,11 +4,12 @@ import {
   ButtonStyle,
   Client,
   ComponentType,
-  TextBasedChannel,
+  TextChannel,
 } from 'discord.js';
 import type { IExtendedInteraction } from 'djs-handlers';
 import { config } from '../config/config';
 import type { TEmojis } from '../types/discord';
+import { isTextChannel } from './assertions';
 import { getServerChoices } from './helpers';
 
 const confirmButton = new ButtonBuilder({
@@ -37,13 +38,17 @@ export const mcServerChoice = {
 
 export function getButtonCollector(
   interaction: IExtendedInteraction,
-  channel: TextBasedChannel,
+  channel: TextChannel,
 ) {
-  return channel.createMessageComponentCollector<ComponentType.Button>({
-    filter: (i) => i.user.id === interaction.user.id,
-    max: 1,
-    time: 10000,
-  });
+  if (isTextChannel(channel)) {
+    return channel.createMessageComponentCollector<ComponentType.Button>({
+      filter: (i) => i.user.id === interaction.user.id,
+      max: 1,
+      time: 10000,
+    });
+  }
+
+  return;
 }
 
 export const getEmojis = (client: Client) => {

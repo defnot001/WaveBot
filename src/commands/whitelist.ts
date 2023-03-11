@@ -3,9 +3,8 @@ import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { config } from '../config/config';
 import type { TServerChoice } from '../types/minecraft';
-import getErrorMessage from '../util/errors';
-import { getServerChoices } from '../util/helpers';
-import { createInteractionErrorLog } from '../util/loggers';
+import { escapeMarkdown, getServerChoices } from '../util/helpers';
+import { handleInteractionError } from '../util/loggers';
 import { getWhitelist, runRconCommand } from '../util/rcon';
 
 export default new Command({
@@ -36,6 +35,7 @@ export default new Command({
           description: `The player's in-game name.`,
           type: ApplicationCommandOptionType.String,
           required: true,
+          autocomplete: true,
         },
       ],
     },
@@ -67,21 +67,22 @@ export default new Command({
       return interaction.reply('This command can only be used in a guild.');
     }
 
-    if (subcommand === 'list') {
-      const choice = args.getString('server');
-      const { host, rconPort, rconPasswd } =
-        config.mcConfig[choice as TServerChoice];
+    try {
+      if (subcommand === 'list') {
+        const choice = args.getString('server');
 
-      if (!choice) {
-        return interaction.editReply('Please specify a server!');
-      }
+        if (!choice) {
+          return interaction.editReply('Please specify a server!');
+        }
 
-      try {
+        const { host, rconPort, rconPasswd } =
+          config.mcConfig[choice as TServerChoice];
+
         const response = await getWhitelist(host, rconPort, rconPasswd);
 
         const whitelist = !response
           ? `There are no whitelisted players on ${choice}!`
-          : response.join('\n');
+          : response.map((ign) => escapeMarkdown(ign)).join('\n');
 
         const whitelistEmbed = new KoalaEmbedBuilder(interaction.user, {
           title: `${choice.toUpperCase()} Whitelist`,
@@ -95,26 +96,18 @@ export default new Command({
         }
 
         return interaction.editReply({ embeds: [whitelistEmbed] });
-      } catch (err) {
-        getErrorMessage(err);
-        return createInteractionErrorLog({
-          interaction: interaction,
-          errorMessage: `Failed to get the whitelist for ${choice}!`,
-        });
-      }
-    } else if (subcommand === 'add' || subcommand === 'remove') {
-      const ign = args.getString('ign');
+      } else {
+        const ign = args.getString('ign');
 
-      if (!ign) {
-        return interaction.editReply('Please provide an in-game name!');
-      }
+        if (!ign) {
+          return interaction.editReply('Please provide an in-game name!');
+        }
 
-      const servers = Object.keys(config.mcConfig);
+        const servers = Object.keys(config.mcConfig);
 
-      const whitelistCheck: [string, string][] = [];
-      const opCheck: [string, string][] = [];
+        const whitelistCheck: [string, string][] = [];
+        const opCheck: [string, string][] = [];
 
-      try {
         for await (const server of servers) {
           const { host, rconPort, rconPasswd } =
             config.mcConfig[server as TServerChoice];
@@ -158,22 +151,13 @@ export default new Command({
               )} as an operator on ${opCheck.length} servers.`;
 
         return interaction.editReply(successMessage);
-      } catch (err) {
-        const errorMessage =
-          subcommand === 'add'
-            ? `Failed to whitelist and/or op ${inlineCode(
-                ign,
-              )} on one or more servers!`
-            : `Failed to unwhitelist and/or deop ${inlineCode(
-                ign,
-              )} on one or more servers!`;
-
-        getErrorMessage(err);
-        return createInteractionErrorLog({
-          interaction: interaction,
-          errorMessage: errorMessage,
-        });
       }
+    } catch (err) {
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `There was an error trying to execute the whitlist ${subcommand} command!`,
+      });
     }
   },
 });

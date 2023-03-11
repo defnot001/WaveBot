@@ -3,9 +3,8 @@ import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { config } from '../config/config';
 import type { TServerChoice } from '../types/minecraft';
-import getErrorMessage from '../util/errors';
 import { getServerChoices } from '../util/helpers';
-import { createInteractionErrorLog } from '../util/loggers';
+import { handleInteractionError } from '../util/loggers';
 import { getServerStatus, queryMobcap, queryMspt } from '../util/rcon';
 
 export default new Command({
@@ -93,10 +92,10 @@ export default new Command({
 
       return interaction.editReply({ embeds: [statusEmbed] });
     } catch (err) {
-      getErrorMessage(err);
-      return createInteractionErrorLog({
-        interaction: interaction,
-        errorMessage: `Failed to get the status of ${choice}!`,
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `There was an error trying to get the status of ${interaction.guild.name} ${choice}`,
       });
     }
   },

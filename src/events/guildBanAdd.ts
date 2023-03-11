@@ -1,7 +1,7 @@
-import { AuditLogEvent, inlineCode } from 'discord.js';
+import { AuditLogEvent } from 'discord.js';
 import { Event } from 'djs-handlers';
 import { ModerationEmbedBuilder } from '../classes/ModerationEmbedBuilder';
-import { createEventErrorLog, getTextChannelFromID } from '../util/loggers';
+import { getTextChannelFromID, handleEventError } from '../util/loggers';
 export default new Event('guildBanAdd', async (guildBan) => {
   try {
     const ban = guildBan.partial ? await guildBan.fetch() : guildBan;
@@ -15,9 +15,7 @@ export default new Event('guildBanAdd', async (guildBan) => {
 
     const banLog = fetchedLogs.entries.first();
 
-    if (!banLog) {
-      throw new Error('Cannot find BanLog.');
-    }
+    if (!banLog) throw new Error('Cannot find BanLog.');
 
     const { executor, target, action, reason } = banLog;
 
@@ -43,13 +41,11 @@ export default new Event('guildBanAdd', async (guildBan) => {
       );
     }
   } catch (err) {
-    console.error(err);
-    createEventErrorLog({
+    return handleEventError({
+      err,
       client: guildBan.client,
       guild: guildBan.guild,
-      errorMessage: `${inlineCode(
-        'GuildBanAdd',
-      )} Event triggered but the embed could not be sent.`,
+      message: `Failed to log the ban of ${guildBan.user.tag}.`,
     });
   }
 });

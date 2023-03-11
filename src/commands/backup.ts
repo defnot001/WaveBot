@@ -8,8 +8,10 @@ import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
 import { config } from '../config/config';
 import type { TServerChoice } from '../types/minecraft';
+import { isTextChannel } from '../util/assertions';
 import { confirmCancelRow, getButtonCollector } from '../util/components';
 import { formatBytes, getServerChoices } from '../util/helpers';
+import { handleInteractionError } from '../util/loggers';
 import { getBackups, ptero } from '../util/pterodactyl';
 
 export default new Command({
@@ -122,223 +124,252 @@ export default new Command({
       );
     }
 
+    if (!isTextChannel(interaction.channel)) {
+      return interaction.editReply(
+        'This command can only be used in a text channel.',
+      );
+    }
+
     const { serverId } = config.mcConfig[serverChoice];
-    const { backups, meta } = await getBackups(serverChoice);
+    try {
+      const { backups, meta } = await getBackups(serverChoice);
 
-    if (subcommand === 'create') {
-      const backupLimit = config.mcConfig[serverChoice].backupLimit;
+      if (subcommand === 'create') {
+        const backupLimit = config.mcConfig[serverChoice].backupLimit;
 
-      if (backupLimit === 0) {
-        return interaction.editReply(
-          `You can not create a backup for ${guild.name} ${bold(
-            serverChoice,
-          )} because this server does not allow backups.`,
-        );
-      }
+        if (backupLimit === 0) {
+          return interaction.editReply(
+            `You can not create a backup for ${guild.name} ${bold(
+              serverChoice,
+            )} because this server does not allow backups.`,
+          );
+        }
 
-      const backupName =
-        args.getString('name') ??
-        `Backup created by KoalaBot at ${new Date().toUTCString()}`;
+        const backupName =
+          args.getString('name') ??
+          `Backup created by KoalaBot at ${new Date().toUTCString()}`;
 
-      if (meta.pagination.total < backupLimit) {
-        const backup = await ptero.backups.create(serverId, {
-          backupName,
-          locked: args.getBoolean('locked') ?? false,
-        });
+        if (meta.pagination.total < backupLimit) {
+          const backup = await ptero.backups.create(serverId, {
+            backupName,
+            locked: args.getBoolean('locked') ?? false,
+          });
 
-        return interaction.editReply(
-          `Successfully created backup (${inlineCode(backup.name)}) for ${
-            interaction.guild.name
-          } ${bold(serverChoice)}!`,
-        );
-      } else {
+          return interaction.editReply(
+            `Successfully created backup (${inlineCode(backup.name)}) for ${
+              interaction.guild.name
+            } ${bold(serverChoice)}!`,
+          );
+        } else {
+          await interaction.editReply({
+            content: `This command will delete the oldest backup for ${
+              interaction.guild.name
+            } ${bold(
+              serverChoice,
+            )} because the backup limit is reached for this server. Are you sure you want to continue? This can not be undone!`,
+            components: [confirmCancelRow],
+          });
+
+          const collector = getButtonCollector(
+            interaction,
+            interaction.channel,
+          );
+
+          if (!collector) {
+            return interaction.editReply(
+              'Failed to create message component collector!',
+            );
+          }
+
+          const oldestBackup = [...backups.values()].pop();
+
+          if (!oldestBackup) {
+            return interaction.editReply(
+              'Something went wrong while trying to delete the oldest backup.',
+            );
+          }
+
+          collector.on('collect', async (i) => {
+            if (i.customId === 'confirm') {
+              await ptero.backups.delete(serverId, oldestBackup.uuid);
+              const backup = await ptero.backups.create(serverId, {
+                backupName,
+                locked: args.getBoolean('locked') ?? false,
+              });
+
+              interaction.editReply({
+                content: `Successfully deleted oldest backup and created backup (${inlineCode(
+                  backup.name,
+                )}) for ${guild.name} ${bold(serverChoice)}!`,
+                components: [],
+              });
+            } else {
+              interaction.editReply({
+                content: `Cancelled deleting the oldest backup for ${
+                  guild.name
+                } ${bold(serverChoice)}!`,
+                components: [],
+              });
+            }
+          });
+        }
+        return;
+      } else if (subcommand === 'delete') {
+        const backupName = args.getString('backup');
+
+        if (!backupName) {
+          return interaction.editReply('Please provide a backup name!');
+        }
+
+        const backupDetails = backups.get(backupName);
+
+        if (!backupDetails) {
+          return interaction.editReply(
+            `Could not find a backup with the name ${inlineCode(
+              backupName,
+            )} for ${guild.name} ${bold(serverChoice)}!`,
+          );
+        }
+
+        if (!backupDetails.completed_at) {
+          return interaction.editReply(
+            `Backup ${inlineCode(backupName)} for ${guild.name} ${bold(
+              serverChoice,
+            )} is not completed yet!`,
+          );
+        }
+
+        if (backupDetails.is_locked) {
+          return interaction.editReply(
+            `Backup ${inlineCode(backupName)} for ${guild.name} ${bold(
+              serverChoice,
+            )} is locked!`,
+          );
+        }
+
         await interaction.editReply({
-          content: `This command will delete the oldest backup for ${
+          content: `This command will delete a backup for ${
             interaction.guild.name
           } ${bold(
             serverChoice,
-          )} because the backup limit is reached for this server. Are you sure you want to continue? This can not be undone!`,
+          )} Are you sure you want to continue? This can not be undone!`,
           components: [confirmCancelRow],
         });
 
         const collector = getButtonCollector(interaction, interaction.channel);
 
-        const oldestBackup = [...backups.values()].pop();
-
-        if (!oldestBackup) {
+        if (!collector) {
           return interaction.editReply(
-            'Something went wrong while trying to delete the oldest backup.',
+            'Failed to created a message collector!',
           );
         }
 
         collector.on('collect', async (i) => {
           if (i.customId === 'confirm') {
-            await ptero.backups.delete(serverId, oldestBackup.uuid);
-            const backup = await ptero.backups.create(serverId, {
-              backupName,
-              locked: args.getBoolean('locked') ?? false,
-            });
+            await ptero.backups.delete(serverId, backupDetails.uuid);
 
             interaction.editReply({
-              content: `Successfully deleted oldest backup and created backup (${inlineCode(
-                backup.name,
-              )}) for ${guild.name} ${bold(serverChoice)}!`,
+              content: `Successfully deleted backup: ${inlineCode(
+                backupDetails.name,
+              )} from ${guild.name} ${bold(serverChoice)}!`,
               components: [],
             });
           } else {
             interaction.editReply({
-              content: `Cancelled deleting the oldest backup for ${
-                guild.name
-              } ${bold(serverChoice)}!`,
+              content: `Cancelled deleting the backup for ${guild.name} ${bold(
+                serverChoice,
+              )}!`,
               components: [],
             });
           }
         });
-      }
-      return;
-    } else if (subcommand === 'delete') {
-      const backupName = args.getString('backup');
+        return;
+      } else if (subcommand === 'details') {
+        const backupName = args.getString('backup');
 
-      if (!backupName) {
-        return interaction.editReply('Please provide a backup name!');
-      }
-
-      const backupDetails = backups.get(backupName);
-
-      if (!backupDetails) {
-        return interaction.editReply(
-          `Could not find a backup with the name ${inlineCode(
-            backupName,
-          )} for ${guild.name} ${bold(serverChoice)}!`,
-        );
-      }
-
-      if (!backupDetails.completed_at) {
-        return interaction.editReply(
-          `Backup ${inlineCode(backupName)} for ${guild.name} ${bold(
-            serverChoice,
-          )} is not completed yet!`,
-        );
-      }
-
-      if (backupDetails.is_locked) {
-        return interaction.editReply(
-          `Backup ${inlineCode(backupName)} for ${guild.name} ${bold(
-            serverChoice,
-          )} is locked!`,
-        );
-      }
-
-      await interaction.editReply({
-        content: `This command will delete a backup for ${
-          interaction.guild.name
-        } ${bold(
-          serverChoice,
-        )} Are you sure you want to continue? This can not be undone!`,
-        components: [confirmCancelRow],
-      });
-
-      const collector = getButtonCollector(interaction, interaction.channel);
-
-      collector.on('collect', async (i) => {
-        if (i.customId === 'confirm') {
-          await ptero.backups.delete(serverId, backupDetails.uuid);
-
-          interaction.editReply({
-            content: `Successfully deleted backup: ${inlineCode(
-              backupDetails.name,
-            )} from ${guild.name} ${bold(serverChoice)}!`,
-            components: [],
-          });
-        } else {
-          interaction.editReply({
-            content: `Cancelled deleting the backup for ${guild.name} ${bold(
-              serverChoice,
-            )}!`,
-            components: [],
-          });
+        if (!backupName) {
+          return interaction.editReply('Please provide a backup name!');
         }
-      });
-      return;
-    } else if (subcommand === 'details') {
-      const backupName = args.getString('backup');
 
-      if (!backupName) {
-        return interaction.editReply('Please provide a backup name!');
-      }
+        const backupDetails = backups.get(backupName);
 
-      const backupDetails = backups.get(backupName);
+        if (!backupDetails) {
+          return interaction.editReply(
+            `Could not find a backup with the name ${inlineCode(
+              backupName,
+            )} for ${guild.name} ${bold(serverChoice)}!`,
+          );
+        }
 
-      if (!backupDetails) {
+        const completedTime = backupDetails.completed_at
+          ? time(backupDetails.completed_at, 'f')
+          : 'Backup not completed.';
+
+        const backupEmbed = new KoalaEmbedBuilder(interaction.user, {
+          title: `Backup Details for ${guild.name} ${serverChoice}`,
+          fields: [
+            { name: 'Name', value: backupDetails.name },
+            {
+              name: 'UUID',
+              value: `${inlineCode(backupDetails.uuid)}`,
+            },
+            {
+              name: 'Size',
+              value: formatBytes(backupDetails.bytes),
+              inline: true,
+            },
+            {
+              name: 'Successful',
+              value: backupDetails.is_successful ? 'true' : 'false',
+              inline: true,
+            },
+            {
+              name: 'Locked',
+              value: backupDetails.is_locked ? 'true' : 'false',
+              inline: true,
+            },
+            {
+              name: 'Created at',
+              value: time(backupDetails.created_at, 'f'),
+              inline: true,
+            },
+            {
+              name: 'Completed at',
+              value: completedTime,
+              inline: true,
+            },
+          ],
+        });
+
+        // we have to check if the guild has an icon because there is no method that provides a default icon.
+        if (guild.iconURL()) {
+          backupEmbed.setThumbnail(guild.iconURL());
+        }
+
+        return interaction.editReply({ embeds: [backupEmbed] });
+      } else if (subcommand === 'list') {
+        const transformedList = Array.from(
+          backups,
+          ([name, backup]) => `${time(backup.created_at, 'f')}\n${bold(name)}`,
+        ).slice(-20);
+
+        const backupListEmbed = new KoalaEmbedBuilder(interaction.user, {
+          title: `Backup List for ${guild.name} ${serverChoice}`,
+          description: transformedList.join('\n\n'),
+        });
+
+        return interaction.editReply({ embeds: [backupListEmbed] });
+      } else {
         return interaction.editReply(
-          `Could not find a backup with the name ${inlineCode(
-            backupName,
-          )} for ${guild.name} ${bold(serverChoice)}!`,
+          `Invalid subcommand ${inlineCode(subcommand)}!`,
         );
       }
-
-      const completedTime = backupDetails.completed_at
-        ? time(backupDetails.completed_at, 'f')
-        : 'Backup not completed.';
-
-      const backupEmbed = new KoalaEmbedBuilder(interaction.user, {
-        title: `Backup Details for ${guild.name} ${serverChoice}`,
-        fields: [
-          { name: 'Name', value: backupDetails.name },
-          {
-            name: 'UUID',
-            value: `${inlineCode(backupDetails.uuid)}`,
-          },
-          {
-            name: 'Size',
-            value: formatBytes(backupDetails.bytes),
-            inline: true,
-          },
-          {
-            name: 'Successful',
-            value: backupDetails.is_successful ? 'true' : 'false',
-            inline: true,
-          },
-          {
-            name: 'Locked',
-            value: backupDetails.is_locked ? 'true' : 'false',
-            inline: true,
-          },
-          {
-            name: 'Created at',
-            value: time(backupDetails.created_at, 'f'),
-            inline: true,
-          },
-          {
-            name: 'Completed at',
-            value: completedTime,
-            inline: true,
-          },
-        ],
+    } catch (err) {
+      return handleInteractionError({
+        interaction,
+        err,
+        message: `Something went wrong while trying to execute the backup command for ${guild.name} ${serverChoice}!`,
       });
-
-      // we have to check if the guild has an icon because there is no method that provides a default icon.
-      if (guild.iconURL()) {
-        backupEmbed.setThumbnail(guild.iconURL());
-      }
-
-      return interaction.editReply({ embeds: [backupEmbed] });
-    } else if (subcommand === 'list') {
-      const transformedList = Array.from(
-        backups,
-        ([name, backup]) => `${time(backup.created_at, 'f')}\n${bold(name)}`,
-      ).slice(-20);
-
-      const backupListEmbed = new KoalaEmbedBuilder(interaction.user, {
-        title: `Backup List for ${guild.name} ${serverChoice}`,
-        description: transformedList.join('\n\n'),
-      });
-
-      return interaction.editReply({ embeds: [backupListEmbed] });
-    } else {
-      return interaction.editReply(
-        `Invalid subcommand ${inlineCode(subcommand)}!`,
-      );
     }
   },
 });
