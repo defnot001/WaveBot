@@ -53,10 +53,6 @@ export default new Event('guildMemberRemove', async (member) => {
       });
 
       modLog.send({ embeds: [kickEmbed] });
-    } else {
-      throw new Error(
-        'The IDs of the target in the AuditLog and the target from the Event did not match.',
-      );
     }
   } catch (err) {
     return handleEventError({
