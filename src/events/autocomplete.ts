@@ -41,20 +41,15 @@ export default new Event('interactionCreate', async (interaction) => {
 
       if (focused.name === 'item') {
         if (action === 'extra') {
-          interaction.respond(mapChoices(['digs', 'bedrock_removed'], focused));
+          const mapped = mapChoices(['digs', 'bedrock_removed'], focused);
+          interaction.respond(mapped);
+        } else if (action !== null) {
+          const targetObjectives = allScboreboards
+            .filter((obj) => obj.stat.startsWith(action))
+            .map((item) => item.stat.replace(`${action}-`, ''));
+
+          interaction.respond(mapChoices(targetObjectives, focused));
         }
-
-        if (!action) {
-          interaction.respond([]);
-          return;
-        }
-
-        const targetObjectives = allScboreboards
-          .filter((obj) => obj.stat.startsWith(action))
-          .map((item) => item.stat.replace(`${action}-`, ''));
-
-        interaction.respond(mapChoices(targetObjectives, focused));
-        return;
       }
     }
 
