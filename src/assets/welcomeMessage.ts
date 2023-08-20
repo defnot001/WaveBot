@@ -1,5 +1,5 @@
 import type { APIEmbedField, Client } from 'discord.js';
-import { config } from '../config/config';
+import { config } from '../config';
 import { getEmojis } from '../util/components';
 
 export const getTrialWelcomeMessage = (client: Client) => {

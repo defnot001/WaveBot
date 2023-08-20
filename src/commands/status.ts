@@ -1,11 +1,12 @@
 import { ApplicationCommandOptionType } from 'discord.js';
 import { Command } from 'djs-handlers';
+import { queryFull } from 'minecraft-server-util';
+import { z } from 'zod';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
-import { config } from '../config/config';
-import type { TServerChoice } from '../types/minecraft';
+import { config, ServerChoice } from '../config';
 import { getServerChoices } from '../util/helpers';
 import { handleInteractionError } from '../util/loggers';
-import { getServerStatus, queryMobcap, queryMspt } from '../util/rcon';
+import { runRconCommand } from '../util/rcon';
 
 export default new Command({
   name: 'status',
@@ -22,7 +23,7 @@ export default new Command({
   execute: async ({ interaction, args }) => {
     await interaction.deferReply();
 
-    const choice = args.getString('server');
+    const choice = args.getString('server', true) as ServerChoice;
 
     if (!choice) {
       return interaction.editReply('Please specify a server!');
@@ -32,11 +33,10 @@ export default new Command({
       return interaction.reply('This command can only be used in a guild.');
     }
 
-    const { host, port, rconPort, rconPasswd } =
-      config.mcConfig[choice as TServerChoice];
+    const { host, port, rconPort, rconPasswd } = config.mcConfig[choice];
 
     try {
-      const status = await getServerStatus(host, port);
+      const status = await queryFull(host, port);
       const performance = await queryMspt(host, rconPort, rconPasswd);
       const mobcap = await queryMobcap(host, rconPort, rconPasswd);
 
@@ -100,3 +100,57 @@ export default new Command({
     }
   },
 });
+
+async function queryMobcap(
+  host: string,
+  rconPort: number,
+  rconPassword: string,
+) {
+  const mobcapSchema = z.object({
+    overworld: z.string(),
+    the_nether: z.string(),
+    the_end: z.string(),
+  });
+
+  type Mobcap = z.infer<typeof mobcapSchema>;
+
+  const dimensions = ['overworld', 'the_nether', 'the_end'];
+
+  const mobcap: Record<string, string> = {};
+
+  for (const dim of dimensions) {
+    const query = `execute in minecraft:${dim} run script run get_mob_counts('monster')`;
+    const res = await runRconCommand(host, rconPort, rconPassword, query);
+
+    const data = res
+      .replace(/^.{0,3}| \(.*\)|[[\]]/g, '')
+      .replace(/, /g, ' | ');
+
+    mobcap[dim as keyof Mobcap] = data;
+  }
+
+  return mobcapSchema.parse(mobcap);
+}
+
+async function queryMspt(host: string, rconPort: number, rconPassword: string) {
+  const command = `script run reduce(system_info('server_last_tick_times'), _a+_, 0)/100`;
+  const data = await runRconCommand(host, rconPort, rconPassword, command);
+
+  const splitNumbers = data.split(' ')[2];
+
+  if (!splitNumbers) {
+    throw new Error('Failed to get parse the data from the server.');
+  }
+
+  const mspt = Math.round(parseFloat(splitNumbers) * 100) / 100;
+
+  let tps: number;
+
+  if (mspt <= 50) {
+    tps = 20;
+  } else {
+    tps = 1000 / mspt;
+  }
+
+  return { mspt, tps };
+}

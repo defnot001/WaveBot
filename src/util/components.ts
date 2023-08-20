@@ -4,13 +4,16 @@ import {
   ButtonStyle,
   Client,
   ComponentType,
+  GuildEmoji,
   TextChannel,
 } from 'discord.js';
 import type { IExtendedInteraction } from 'djs-handlers';
-import { config } from '../config/config';
-import type { TEmojis } from '../types/discord';
-import { isTextChannel } from './assertions';
+import { config, EmojiConfig } from '../config';
 import { getServerChoices } from './helpers';
+
+type ConfigEmojis = {
+  [key in keyof EmojiConfig]: GuildEmoji;
+};
 
 const confirmButton = new ButtonBuilder({
   style: ButtonStyle.Success,
@@ -36,11 +39,11 @@ export const mcServerChoice = {
   choices: [...getServerChoices()],
 };
 
-export function getButtonCollector(
-  interaction: IExtendedInteraction,
-  channel: TextChannel,
-) {
-  if (isTextChannel(channel)) {
+export function getButtonCollector(interaction: IExtendedInteraction) {
+  const { channel } = interaction;
+  if (!channel) return;
+
+  if (channel instanceof TextChannel) {
     return channel.createMessageComponentCollector<ComponentType.Button>({
       filter: (i) => i.user.id === interaction.user.id,
       max: 1,
@@ -66,5 +69,5 @@ export const getEmojis = (client: Client) => {
     }
   }
 
-  return emojis as TEmojis;
+  return emojis as ConfigEmojis;
 };

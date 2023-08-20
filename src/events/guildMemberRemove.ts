@@ -7,7 +7,7 @@ import { getTextChannelFromID, handleEventError } from '../util/loggers';
 
 export default new Event('guildMemberRemove', async (member) => {
   try {
-    console.log(`${member.user.tag} left ${member.guild.name}`);
+    console.log(`${member.user.username} left ${member.guild.name}`);
 
     const joinedAt = getJoinedAtComponent(member);
     const memberLog = await getTextChannelFromID(member.guild, 'memberLog');
@@ -39,11 +39,13 @@ export default new Event('guildMemberRemove', async (member) => {
       throw new Error('Cannot find executor or target from the Audit Log.');
     }
 
-    const executingMember = await member.guild.members.fetch(executor.id);
-    const modLog = await getTextChannelFromID(member.guild, 'modLog');
-
     if (target.id === member.user.id) {
-      console.log(`${member.user.tag} was kicked from ${member.guild.name}.`);
+      console.log(
+        `${member.user.username} was kicked from ${member.guild.name}.`,
+      );
+
+      const executingMember = await member.guild.members.fetch(executor.id);
+      const modLog = await getTextChannelFromID(member.guild, 'modLog');
 
       const kickEmbed = new ModerationEmbedBuilder({
         target: member.user,
@@ -59,7 +61,7 @@ export default new Event('guildMemberRemove', async (member) => {
       err,
       client: member.client,
       guild: member.guild,
-      message: `Failed to log the leaving/kick of ${member.user.tag}.`,
+      message: `Failed to log the leaving/kick of ${member.user.username}.`,
     });
   }
 });

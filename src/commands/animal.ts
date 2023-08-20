@@ -3,6 +3,12 @@ import { ApplicationCommandOptionType } from 'discord.js';
 import { Command } from 'djs-handlers';
 import { handleInteractionError } from '../util/loggers';
 
+const apiURL = {
+  fox: 'https://randomfox.ca/floof/',
+  cat: 'https://api.thecatapi.com/v1/images/search',
+  dog: 'https://api.thedogapi.com/v1/images/search',
+} as const;
+
 export default new Command({
   name: 'animal',
   description: 'Get random pictures from animals.',
@@ -20,27 +26,22 @@ export default new Command({
     },
   ],
   execute: async ({ interaction, args }) => {
-    await interaction.deferReply();
-
-    const choice = args.getString('animal');
-    if (!choice) return interaction.editReply('Please select an animal.');
-
-    const apiURL = {
-      fox: 'https://randomfox.ca/floof/',
-      cat: 'https://api.thecatapi.com/v1/images/search',
-      dog: 'https://api.thedogapi.com/v1/images/search',
-    } as const;
-
     try {
-      const { data } = await axios.get(apiURL[choice as keyof typeof apiURL]);
-      const imageURL: string = choice === 'fox' ? data.image : data[0].url;
+      await interaction.deferReply();
 
-      return interaction.editReply({ files: [imageURL] });
+      const choice = args.getString('animal', true) as 'fox' | 'cat' | 'dog';
+      const { data } = await axios.get(apiURL[choice]);
+      const imageURL = choice === 'fox' ? data.image : data[0].url;
+
+      await interaction.editReply({ files: [imageURL] });
     } catch (err) {
-      return handleInteractionError({
+      handleInteractionError({
         interaction,
         err,
-        message: `Something went wrong trying to get a picture of a ${choice}.`,
+        message: `Something went wrong trying to get a picture of a ${args.getString(
+          'animal',
+          true,
+        )}.`,
       });
     }
   },

@@ -6,7 +6,7 @@ export default new Event('guildBanAdd', async (guildBan) => {
   try {
     const ban = guildBan.partial ? await guildBan.fetch() : guildBan;
 
-    console.log(`${ban.user.tag} was banned from ${ban.guild}.`);
+    console.log(`${ban.user.username} was banned from ${ban.guild}.`);
 
     const fetchedLogs = await ban.guild.fetchAuditLogs({
       limit: 1,
@@ -45,7 +45,7 @@ export default new Event('guildBanAdd', async (guildBan) => {
       err,
       client: guildBan.client,
       guild: guildBan.guild,
-      message: `Failed to log the ban of ${guildBan.user.tag}.`,
+      message: `Failed to log the ban of ${guildBan.user.username}.`,
     });
   }
 });

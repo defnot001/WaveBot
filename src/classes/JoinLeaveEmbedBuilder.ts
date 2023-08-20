@@ -4,8 +4,9 @@ import {
   type EmbedData,
   type GuildMember,
   type PartialGuildMember,
+  escapeMarkdown,
 } from 'discord.js';
-import { config } from '../config/config';
+import { config } from '../config';
 
 export class JoinLeaveEmbedBuilder extends EmbedBuilder {
   constructor(
@@ -16,7 +17,7 @@ export class JoinLeaveEmbedBuilder extends EmbedBuilder {
     super(data);
 
     this.setAuthor({
-      name: member.user.tag,
+      name: escapeMarkdown(member.user.username),
       iconURL: member.user.displayAvatarURL(),
     });
 

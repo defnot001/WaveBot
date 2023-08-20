@@ -22,7 +22,7 @@ export default new Event('interactionCreate', async (interaction) => {
     `in #${getChannelName(interaction.channel)}` || '';
 
   console.log(
-    `${interaction.user.tag} ${channelNameAddon} triggered an interaction.`,
+    `${interaction.user.username} ${channelNameAddon} triggered an interaction.`,
   );
 
   if (!command) {

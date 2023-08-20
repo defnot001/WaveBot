@@ -1,8 +1,7 @@
 import { ApplicationCommandOptionType } from 'discord.js';
 import { Command } from 'djs-handlers';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
-import { config } from '../config/config';
-import type { TServerChoice } from '../types/minecraft';
+import { config, ServerChoice } from '../config';
 import { mcServerChoice } from '../util/components';
 import { handleInteractionError } from '../util/loggers';
 import { getModFiles, getModNames, ptero } from '../util/pterodactyl';
@@ -48,7 +47,7 @@ export default new Command({
       return interaction.editReply('Cannot find guild!');
     }
 
-    const serverChoice = args.getString('server') as TServerChoice;
+    const serverChoice = args.getString('server') as ServerChoice;
 
     if (!serverChoice) {
       return interaction.editReply('Cannot find server!');

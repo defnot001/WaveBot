@@ -1,8 +1,11 @@
-import { ApplicationCommandOptionType, userMention } from 'discord.js';
+import {
+  ApplicationCommandOptionType,
+  GuildMember,
+  userMention,
+} from 'discord.js';
 import { Command } from 'djs-handlers';
 import { getTrialWelcomeMessage } from '../assets/welcomeMessage';
 import { KoalaEmbedBuilder } from '../classes/KoalaEmbedBuilder';
-import { isGuildMember } from '../util/assertions';
 import { getEmojis } from '../util/components';
 import { handleInteractionError } from '../util/loggers';
 
@@ -20,7 +23,7 @@ export default new Command({
   execute: async ({ interaction, args }) => {
     const target = args.getMember('target');
 
-    if (!isGuildMember(target)) {
+    if (!(target instanceof GuildMember)) {
       return interaction.reply({
         content: 'The target you chose is not a member of this guild!',
         ephemeral: true,

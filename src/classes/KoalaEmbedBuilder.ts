@@ -3,8 +3,9 @@ import {
   type APIEmbed,
   type EmbedData,
   type User,
+  escapeMarkdown,
 } from 'discord.js';
-import { config } from '../config/config';
+import { config } from '../config';
 export class KoalaEmbedBuilder extends EmbedBuilder {
   constructor(user: User, data?: EmbedData | APIEmbed) {
     super(data);
@@ -12,7 +13,7 @@ export class KoalaEmbedBuilder extends EmbedBuilder {
     this.setColor(config.embedColors.default);
 
     this.setFooter({
-      text: `Requested by ${user.username}`,
+      text: `Requested by ${escapeMarkdown(user.username)}`,
       iconURL: user.displayAvatarURL(),
     });
 

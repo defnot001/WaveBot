@@ -1,12 +1,12 @@
 import { Event } from 'djs-handlers';
 import { client } from '..';
-import dictionary119 from '../assets/dictionary_1.19';
-import { customScoreboardObjectives } from '../commands/scoreboard';
-import { config } from '../config/config';
-import type { TServerChoice } from '../types/minecraft';
+import type { ScoreboardChoice } from '../commands/scoreboard';
+import allScboreboards from '../assets/scoreboards_1.19.2';
+import { config, ServerChoice } from '../config';
 import { handleEventError } from '../util/loggers';
 import { getModNames, ptero } from '../util/pterodactyl';
 import { getWhitelist } from '../util/rcon';
+import type { AutocompleteFocusedOption } from 'discord.js';
 
 export default new Event('interactionCreate', async (interaction) => {
   if (!interaction.isAutocomplete()) return;
@@ -20,51 +20,52 @@ export default new Event('interactionCreate', async (interaction) => {
     );
   }
 
-  const focused = interaction.options.getFocused(true);
+  const guild = interaction.guild;
 
-  const mapChoices = (choices: string[]) => {
-    return choices
-      .filter((choice) => choice.startsWith(focused.value))
-      .slice(0, 25)
-      .map((choice) => ({ name: choice, value: choice }));
-  };
+  if (!guild) return;
+
+  const focused = interaction.options.getFocused(true);
 
   try {
     if (interaction.commandName === 'scoreboard') {
-      const objectives = Object.keys(dictionary119).map((key) => key);
-      const action = interaction.options.getString('action');
+      const action = interaction.options.getString(
+        'action',
+      ) as ScoreboardChoice | null;
 
       if (focused.name === 'playername') {
         const { host, rconPort, rconPasswd } = config.mcConfig['smp'];
-
         const whitelistNames = await getWhitelist(host, rconPort, rconPasswd);
 
-        return interaction.respond(mapChoices(whitelistNames));
-      } else if (focused.name === 'item') {
-        if (action === 'custom') {
-          return interaction.respond(mapChoices(customScoreboardObjectives));
-        } else {
-          if (!action) return interaction.respond([]);
+        interaction.respond(mapChoices(whitelistNames, focused));
+      }
 
-          const targetObjectives = objectives
-            .filter((obj) => obj.startsWith(action))
-            .map((item) => item.replace(action, ''));
-
-          return interaction.respond(mapChoices(targetObjectives));
+      if (focused.name === 'item') {
+        if (action === 'extra') {
+          interaction.respond(mapChoices(['digs', 'bedrock_removed'], focused));
         }
+
+        if (!action) {
+          interaction.respond([]);
+          return;
+        }
+
+        const targetObjectives = allScboreboards
+          .filter((obj) => obj.stat.startsWith(action))
+          .map((item) => item.stat.replace(`${action}-`, ''));
+
+        interaction.respond(mapChoices(targetObjectives, focused));
+        return;
       }
     }
 
-    const subcommand = interaction.options.getSubcommand();
-
     if (interaction.commandName === 'whitelist') {
-      let totalWhitelist: string[] = [];
+      const totalWhitelist: string[] = [];
 
       for (const server in config.mcConfig) {
         if (server === 'snapshots') continue;
 
         const { host, rconPort, rconPasswd } =
-          config.mcConfig[server as TServerChoice];
+          config.mcConfig[server as ServerChoice];
 
         const whitelistNames = await getWhitelist(host, rconPort, rconPasswd);
 
@@ -75,24 +76,31 @@ export default new Event('interactionCreate', async (interaction) => {
         a.toLowerCase().localeCompare(b.toLowerCase()),
       );
 
-      return interaction.respond(mapChoices(whitelistNames));
+      interaction.respond(mapChoices(whitelistNames, focused));
     }
 
-    const serverChoice = interaction.options.getString('server') as
-      | TServerChoice
-      | undefined;
-
-    if (!serverChoice) return interaction.respond([]);
-
     if (interaction.commandName === 'mods') {
+      const serverChoice = interaction.options.getString('server') as
+        | ServerChoice
+        | undefined;
+
+      if (!serverChoice) return interaction.respond([]);
+
       const modNames = await getModNames(serverChoice);
       const modNamesChoice =
-        subcommand === 'enable' ? modNames.disabled : modNames.enabled;
+        interaction.options.getSubcommand() === 'enable'
+          ? modNames.disabled
+          : modNames.enabled;
 
-      return interaction.respond(mapChoices(modNamesChoice));
+      interaction.respond(mapChoices(modNamesChoice, focused));
     }
 
     if (interaction.commandName === 'backup') {
+      const serverChoice = interaction.options.getString('server') as
+        | ServerChoice
+        | undefined;
+
+      if (!serverChoice) return interaction.respond([]);
       const backupListResponse = await ptero.backups.list(
         config.mcConfig[serverChoice].serverId,
       );
@@ -101,7 +109,7 @@ export default new Event('interactionCreate', async (interaction) => {
         .reverse()
         .map((backup) => backup.name);
 
-      return interaction.respond(mapChoices(backupNames));
+      interaction.respond(mapChoices(backupNames, focused));
     }
   } catch (err) {
     return handleEventError({
@@ -112,3 +120,10 @@ export default new Event('interactionCreate', async (interaction) => {
     });
   }
 });
+
+function mapChoices(choices: string[], focused: AutocompleteFocusedOption) {
+  return choices
+    .filter((choice) => choice.startsWith(focused.value))
+    .slice(0, 25)
+    .map((choice) => ({ name: choice, value: choice }));
+}

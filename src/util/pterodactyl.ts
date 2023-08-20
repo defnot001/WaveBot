@@ -1,13 +1,13 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { PteroClient } from 'ptero-client';
-import { config } from '../config/config';
-import type { TServerChoice } from '../types/minecraft';
+import { config, ServerChoice } from '../config';
 
 export const ptero = new PteroClient({
   baseURL: config.ptero.url,
   apiKey: config.ptero.apiKey,
 });
 
-export async function getModFiles(serverChoice: TServerChoice) {
+export async function getModFiles(serverChoice: ServerChoice) {
   const modFiles = await (
     await ptero.files.list(config.mcConfig[serverChoice].serverId, '/mods')
   ).filter((mod) => {
@@ -17,7 +17,7 @@ export async function getModFiles(serverChoice: TServerChoice) {
   return modFiles;
 }
 
-async function getMods(serverChoice: TServerChoice) {
+async function getMods(serverChoice: ServerChoice) {
   const modFiles = await getModFiles(serverChoice);
 
   return {
@@ -30,7 +30,7 @@ async function getMods(serverChoice: TServerChoice) {
   };
 }
 
-export async function getModNames(serverChoice: TServerChoice) {
+export async function getModNames(serverChoice: ServerChoice) {
   const mods = await getMods(serverChoice);
 
   return {
@@ -39,17 +39,10 @@ export async function getModNames(serverChoice: TServerChoice) {
   };
 }
 
-export async function getBackups(serverChoice: TServerChoice) {
-  const backups = await ptero.backups.list(
+export async function getServerState(serverChoice: ServerChoice) {
+  const serverStats = await ptero.servers.getResourceUsage(
     config.mcConfig[serverChoice].serverId,
   );
 
-  const backupMap = new Map(
-    backups.data.reverse().map((backup) => [backup.name, backup]),
-  );
-
-  return {
-    backups: backupMap,
-    meta: backups.meta,
-  };
+  return serverStats.current_state;
 }

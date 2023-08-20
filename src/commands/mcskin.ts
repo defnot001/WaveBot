@@ -1,8 +1,13 @@
 import axios from 'axios';
 import { ApplicationCommandOptionType, AttachmentBuilder } from 'discord.js';
 import { Command } from 'djs-handlers';
-import type { TAvatarOptions, TMojangUUIDResponse } from '../types/minecraft';
+import { z } from 'zod';
 import { handleInteractionError } from '../util/loggers';
+
+const uuidResponseSchema = z.object({
+  name: z.string(),
+  id: z.string(),
+});
 
 export default new Command({
   name: 'mcskin',
@@ -30,7 +35,11 @@ export default new Command({
   execute: async ({ interaction, args }) => {
     await interaction.deferReply();
 
-    const imageType = args.getString('type') as TAvatarOptions;
+    const imageType = args.getString('type', true) as
+      | '/avatars/'
+      | '/renders/head/'
+      | '/renders/body/'
+      | '/skins/';
     const name = args.getString('name');
 
     if (!name) {
@@ -38,15 +47,16 @@ export default new Command({
     }
 
     try {
-      const uuidResponse = await axios.get<TMojangUUIDResponse>(
+      const uuidResponse = await axios.get(
         `https://api.mojang.com/users/profiles/minecraft/${name}`,
       );
 
       if (uuidResponse.status !== 200) {
-        return interaction.editReply('Could not find that user!');
+        return interaction.editReply('Could not find the skin of that user!');
       }
 
-      const url = `https://crafatar.com${imageType}${uuidResponse.data.id}`;
+      const uuidResponseData = uuidResponseSchema.parse(uuidResponse.data);
+      const url = `https://crafatar.com${imageType}${uuidResponseData.id}`;
 
       const { data, status } = await axios.get<Buffer>(url, {
         responseType: 'arraybuffer',
@@ -61,13 +71,17 @@ export default new Command({
         description: 'Minecraft skin of a player.',
       });
 
-      return interaction.editReply({ files: [skinAttachment] });
+      interaction.editReply({ files: [skinAttachment] });
+
+      return;
     } catch (err) {
-      return handleInteractionError({
+      handleInteractionError({
         interaction,
         err,
         message: `Failed to get the skin for ${name}!`,
       });
+
+      return;
     }
   },
 });

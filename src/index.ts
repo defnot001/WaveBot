@@ -1,6 +1,6 @@
 import { GatewayIntentBits, Partials } from 'discord.js';
 import { ExtendedClient } from 'djs-handlers';
-import { config, projectPaths } from './config/config';
+import { config, projectPaths } from './config';
 
 export const client = new ExtendedClient({
   intents: [
