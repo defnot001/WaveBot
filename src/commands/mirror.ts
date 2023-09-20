@@ -7,6 +7,14 @@ import { getServerState, ptero } from '../util/pterodactyl';
 import { queryFull } from 'minecraft-server-util';
 import axios from 'axios';
 
+const worldFolderName = {
+  smp: 'WT',
+  cmp: 'CS1',
+  cmp2: 'world',
+  copy: 'world',
+  snapshots: 'world',
+};
+
 export default new Command({
   name: 'mirror',
   description: 'Copy region files from one server to another.',
@@ -158,8 +166,10 @@ async function mirrorRegionFiles(
   }[dimension];
 
   const fileTypes = ['region', 'entities', 'poi'] as const;
+
   const filePaths = fileTypes.map(
-    (type) => `world/${dimensionPath}${type}/${regionName}`,
+    (type) =>
+      `${worldFolderName[server]}/${dimensionPath}${type}/${regionName}`,
   );
 
   const linkPromises = filePaths.map((path) =>
@@ -234,7 +244,7 @@ async function areRegionsIncluded(
 
   const regionFiles = await ptero.files.list(
     config.mcConfig[server].serverId,
-    `world/${dimensionPath}region`,
+    `${worldFolderName[server]}/${dimensionPath}region`,
   );
 
   const regionFileNames = regionFiles.map((file) => file.name);
